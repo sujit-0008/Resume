@@ -156,6 +156,7 @@ textarea.field{min-height:80px;resize:vertical}
 <script>
 /* ---------- storage (phone only, never leaves the device) ---------- */
 const KEY = 'ringbook.v1';
+const NATIVE = !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
 const db = load();
 function load(){
   try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.contacts) return d; } catch(e){}
@@ -332,7 +333,8 @@ function doAction(c, kind){
     location.href = `sms:${digits(c.phone)}${/iPhone|iPad/.test(navigator.userAgent)?'&':'?'}body=${body}`;
   } else if (kind === 'wa') {
     c.log.push({ t: Date.now(), type: 'wa' }); save();
-    window.open(`https://wa.me/${intl(c.phone)}?text=${encodeURIComponent(fillMsg(c))}`, '_blank');
+    const url = `https://wa.me/${intl(c.phone)}?text=${encodeURIComponent(fillMsg(c))}`;
+    NATIVE ? (location.href = url) : window.open(url, '_blank');
   }
 }
 // When they come back from the phone app, ask how it went.
@@ -617,7 +619,16 @@ function openSettings(){
     el.querySelector('#wipe').onclick = () => { if (confirm('Erase all saved numbers and history from this phone?') && confirm('Really? This cannot be undone.')) { db.contacts = []; save(); closeSheet(); } };
   });
 }
-function download(name, text, type){
+async function download(name, text, type){
+  if (NATIVE) {
+    // Inside the Android/iOS app: write the file, then open the share sheet (Drive, WhatsApp, email…)
+    const { Filesystem, Share } = Capacitor.Plugins;
+    try {
+      const r = await Filesystem.writeFile({ path: name, data: text, directory: 'CACHE', encoding: 'utf8' });
+      await Share.share({ title: name, url: r.uri });
+    } catch (e) { if (!/cancel/i.test(e.message||'')) toast('Could not export'); }
+    return;
+  }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
@@ -676,7 +687,7 @@ document.addEventListener('click', e => {
 // refresh "x min ago" labels and overdue reminders
 setInterval(render, 60000);
 render();
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+if (!NATIVE && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 </script>
 </body>
 </html>

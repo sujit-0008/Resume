@@ -1,0 +1,7 @@
+{
+  "appId": "app.ringbook.dialer",
+  "appName": "Ringbook",
+  "webDir": "www",
+  "android": { "allowMixedContent": false },
+  "server": { "androidScheme": "https" }
+}
