@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d1b17">
+<title>Ringbook</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+:root{
+  --paper:#f4efe6; --card:#fffdf8; --ink:#1d1b17; --ink2:#5d574c; --line:#e2dacb;
+  --red:#e8552d; --green:#2f7d4f; --amber:#c98a12; --blue:#2c5d8a; --grey:#8b8476;
+  --mono:ui-monospace,"SF Mono","Roboto Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.4 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+.wrap{max-width:560px;margin:0 auto;padding:0 16px calc(110px + env(safe-area-inset-bottom))}
+
+/* header */
+header{padding:calc(18px + env(safe-area-inset-top)) 0 8px;display:flex;align-items:flex-end;justify-content:space-between}
+.brand{font-size:28px;font-weight:800;letter-spacing:-.03em}
+.brand i{font-style:normal;color:var(--red)}
+.iconbtn{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;border:1.5px solid var(--line);background:var(--card)}
+.tally{display:flex;gap:18px;margin:6px 0 14px;font-size:13px;color:var(--ink2)}
+.tally b{display:block;font:700 22px var(--mono);color:var(--ink)}
+
+/* lists + tabs */
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;padding:7px 13px;border-radius:999px;border:1.5px solid var(--line);background:var(--card);font-size:14px;white-space:nowrap}
+.chip.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);margin:12px 0;border-bottom:1.5px solid var(--line)}
+.tab{padding:10px 0;font-size:14px;color:var(--ink2);border-bottom:3px solid transparent;margin-bottom:-1.5px}
+.tab.on{color:var(--ink);font-weight:700;border-color:var(--red)}
+.tab small{font:12px var(--mono);opacity:.7}
+.search{width:100%;padding:11px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);margin-bottom:10px}
+.search:focus,.field:focus{outline:2px solid var(--ink);outline-offset:-1px}
+
+/* rows */
+.row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.row .who{flex:1;min-width:0}
+.row .nm{font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .ph{font:14px var(--mono);color:var(--ink2);letter-spacing:.02em}
+.row .meta{font-size:12px;color:var(--grey);margin-top:2px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 6px;border-radius:4px;border:1.5px solid currentColor}
+.s-new{color:var(--grey)} .s-noanswer{color:var(--amber)} .s-callback{color:var(--blue)}
+.s-interested{color:var(--green)} .s-notinterested{color:var(--ink2)} .s-wrong{color:var(--red)}
+.inbound{color:var(--green);font-weight:700}
+.acts{display:flex;gap:6px}
+.act{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;border:1.5px solid var(--line);background:var(--card)}
+.act.call{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.act svg{width:20px;height:20px}
+.empty{text-align:center;padding:50px 20px;color:var(--ink2)}
+.empty h3{color:var(--ink);margin:0 0 6px;font-size:20px}
+.overdue{color:var(--red);font-weight:700}
+
+/* bottom bar */
+.bar{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--paper) 30%);display:flex;justify-content:center;gap:10px;pointer-events:none}
+.bar>*{pointer-events:auto}
+.big{height:54px;padding:0 22px;border-radius:16px;font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px;justify-content:center}
+.big.dark{background:var(--ink);color:var(--paper);flex:1;max-width:340px}
+.big.red{background:var(--red);color:#fff}
+.big.light{background:var(--card);border:1.5px solid var(--line)}
+
+/* sheets */
+.scrim{position:fixed;inset:0;background:rgba(29,27,23,.45);opacity:0;pointer-events:none;transition:.2s;z-index:10}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;max-height:92vh;overflow-y:auto;background:var(--paper);border-radius:22px 22px 0 0;padding:10px 18px calc(22px + env(safe-area-inset-bottom));transform:translateY(105%);transition:transform .25s cubic-bezier(.2,.8,.3,1);z-index:11;max-width:600px;margin:0 auto}
+.sheet.on{transform:none}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 12px}
+.sheet h2{margin:4px 0 14px;font-size:22px;letter-spacing:-.02em}
+.menu button{display:flex;gap:14px;align-items:center;width:100%;text-align:left;padding:14px;border-radius:14px;background:var(--card);border:1.5px solid var(--line);margin-bottom:10px}
+.menu b{display:block}
+.menu small{color:var(--ink2)}
+.menu .ic{width:42px;height:42px;border-radius:12px;background:var(--paper);display:grid;place-items:center;font-size:20px;flex:none}
+label.l{display:block;font-size:13px;font-weight:600;color:var(--ink2);margin:12px 0 5px}
+.field{width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--card)}
+textarea.field{min-height:80px;resize:vertical}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.outs button{padding:14px 10px;border-radius:14px;background:var(--card);border:1.5px solid var(--line);font-weight:650;text-align:left}
+.outs button span{display:block;font-size:12px;font-weight:400;color:var(--ink2)}
+.outs .good{border-color:var(--green);color:var(--green)}
+.log{margin:10px 0 0;padding:0;list-style:none;font-size:14px}
+.log li{padding:8px 0;border-bottom:1px dashed var(--line);display:flex;justify-content:space-between;gap:10px}
+.log time{font:12px var(--mono);color:var(--ink2);white-space:nowrap}
+.linkbtn{color:var(--red);font-weight:700;padding:8px 0}
+.hint{font-size:13px;color:var(--ink2)}
+
+/* import review */
+.rv{display:grid;grid-template-columns:28px 1fr 1fr;gap:6px;align-items:center;margin-bottom:6px}
+.rv input[type=text],.rv input[type=tel]{padding:9px 10px;border-radius:10px;border:1.5px solid var(--line);background:var(--card);width:100%;min-width:0}
+.rv input[type=tel]{font-family:var(--mono);font-size:14px}
+.rv.dup input{opacity:.5}
+.rv input[type=checkbox]{width:20px;height:20px;accent-color:var(--ink)}
+.preview{width:100%;max-height:180px;object-fit:contain;border-radius:12px;background:#000;margin-bottom:10px}
+.bar2{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin:10px 0}
+.bar2 i{display:block;height:100%;background:var(--red);width:0;transition:width .2s}
+
+/* focus mode */
+.focus{position:fixed;inset:0;background:var(--ink);color:var(--paper);z-index:20;display:none;flex-direction:column;padding:calc(18px + env(safe-area-inset-top)) 22px calc(24px + env(safe-area-inset-bottom))}
+.focus.on{display:flex}
+.focus .top{display:flex;justify-content:space-between;align-items:center;font:14px var(--mono);color:#a9a295}
+.focus .x{color:var(--paper);font-size:15px;border:1.5px solid #3b372f;padding:8px 14px;border-radius:10px}
+.focus .mid{flex:1;display:flex;flex-direction:column;justify-content:center}
+.focus .fn{font-size:36px;font-weight:800;letter-spacing:-.03em;line-height:1.1;word-break:break-word}
+.focus .fp{font:22px var(--mono);color:#d8d0c1;margin-top:10px}
+.focus .fnote{margin-top:14px;color:#a9a295;font-size:15px}
+.focus .row3{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.focus .ghost{height:50px;border-radius:14px;border:1.5px solid #3b372f;color:var(--paper);font-weight:600}
+.focus .dial{height:72px;border-radius:20px;background:var(--red);color:#fff;font-size:20px;font-weight:800;width:100%;display:flex;align-items:center;justify-content:center;gap:10px}
+.toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translate(-50%,20px);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:.2s;z-index:30;pointer-events:none;white-space:nowrap}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">Ring<i>book</i></div>
+    <button class="iconbtn" id="btnSettings" aria-label="Settings">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+    </button>
+  </header>
+  <div class="tally" id="tally"></div>
+  <div class="chips" id="lists"></div>
+  <div class="tabs" id="tabs"></div>
+  <input class="search" id="q" type="search" placeholder="Search name, number or note">
+  <div id="rows"></div>
+</div>
+
+<div class="bar">
+  <button class="big light" id="btnAdd" aria-label="Add numbers">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg> Add
+  </button>
+  <button class="big dark" id="btnStart">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Start calling
+  </button>
+</div>
+
+<input type="file" id="fileCam" accept="image/*" capture="environment" hidden>
+<input type="file" id="fileImg" accept="image/*" hidden>
+<input type="file" id="fileData" accept=".csv,.json,text/csv,application/json" hidden>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet"><div class="grab"></div><div id="sheetBody"></div></div>
+
+<div class="focus" id="focus"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- storage (phone only, never leaves the device) ---------- */
+const KEY = 'ringbook.v1';
+const db = load();
+function load(){
+  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.contacts) return d; } catch(e){}
+  return { contacts: [], settings: { cc: '', msg: 'Hi {name}, ' } };
+}
+function save(){ localStorage.setItem(KEY, JSON.stringify(db)); render(); }
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+
+const STATUS = {
+  new:{t:'New'}, noanswer:{t:'No answer'}, callback:{t:'Call later'},
+  interested:{t:'Interested'}, notinterested:{t:'Not interested'}, wrong:{t:'Wrong no.'}
+};
+const OUTCOMES = [
+  ['interested','Interested','Talked, wants more', 'good'],
+  ['notinterested','Not interested','Talked, said no'],
+  ['noanswer','No answer','Ringing / busy / off'],
+  ['callback','Call later','Pick a time'],
+  ['wrong','Wrong number','Remove from queue'],
+];
+
+const ui = { list: 'all', tab: 'todo', q: '' };
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const digits = p => String(p).replace(/[^\d+]/g,'');
+
+function intl(p){
+  let d = digits(p);
+  if (d.startsWith('+')) return d.slice(1);
+  if (d.startsWith('00')) return d.slice(2);
+  const cc = digits(db.settings.cc).replace('+','');
+  if (cc) { d = d.replace(/^0+/, ''); if (!d.startsWith(cc) || d.length <= 10) d = cc + d; }
+  return d;
+}
+function ago(t){
+  if (!t) return '';
+  const s = (Date.now()-t)/1000;
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s/60)+'m ago';
+  if (s < 86400) return Math.floor(s/3600)+'h ago';
+  if (s < 172800) return 'yesterday';
+  return new Date(t).toLocaleDateString(undefined,{day:'numeric',month:'short'});
+}
+const stamp = t => new Date(t).toLocaleString(undefined,{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
+const lastOut = c => c.log.filter(l => l.type !== 'in').at(-1);
+const isToday = t => new Date(t).toDateString() === new Date().toDateString();
+function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('on'); clearTimeout(toast.h); toast.h=setTimeout(()=>t.classList.remove('on'),1800); }
+
+/* which bucket a contact belongs to */
+function bucket(c){
+  if (c.status === 'new' || c.status === 'noanswer') return 'todo';
+  if (c.status === 'callback' || c.status === 'interested') return 'follow';
+  return 'done';
+}
+function inList(c){ return ui.list === 'all' || c.list === ui.list; }
+function sortFn(a,b){
+  // follow-ups due first, then never-called, then oldest attempt
+  const fa = a.followUp || Infinity, fb = b.followUp || Infinity;
+  if (fa !== fb) return fa - fb;
+  const la = lastOut(a)?.t || 0, lb = lastOut(b)?.t || 0;
+  if (la !== lb) return la - lb;
+  return a.created - b.created;
+}
+
+/* ---------- render ---------- */
+function render(){
+  const all = db.contacts;
+  const today = all.flatMap(c => c.log).filter(l => isToday(l.t));
+  $('#tally').innerHTML = `
+    <div><b>${today.filter(l=>l.type==='call').length}</b>calls today</div>
+    <div><b>${today.filter(l=>l.type==='in').length}</b>called back</div>
+    <div><b>${all.filter(c=>c.status==='interested').length}</b>interested</div>
+    <div><b>${all.length}</b>saved</div>`;
+
+  const lists = [...new Set(all.map(c => c.list).filter(Boolean))];
+  if (ui.list !== 'all' && !lists.includes(ui.list)) ui.list = 'all';
+  $('#lists').innerHTML = [['all','All lists'], ...lists.map(l=>[l,l])]
+    .map(([v,t]) => `<button class="chip ${ui.list===v?'on':''}" data-list="${esc(v)}">${esc(t)}</button>`).join('');
+
+  const scoped = all.filter(inList);
+  const count = k => k==='all' ? scoped.length : scoped.filter(c => bucket(c)===k).length;
+  $('#tabs').innerHTML = [['todo','To call'],['follow','Follow up'],['done','Done'],['all','All']]
+    .map(([k,t]) => `<button class="tab ${ui.tab===k?'on':''}" data-tab="${k}">${t} <small>${count(k)}</small></button>`).join('');
+
+  const q = ui.q.toLowerCase();
+  const shown = scoped
+    .filter(c => ui.tab==='all' || bucket(c)===ui.tab)
+    .filter(c => !q || (c.name+' '+c.phone+' '+(c.note||'')).toLowerCase().includes(q) || digits(c.phone).includes(digits(q)||'#'))
+    .sort(sortFn);
+
+  if (!all.length) {
+    $('#rows').innerHTML = `<div class="empty"><h3>Your call sheet is empty</h3>
+      Snap a photo of a paper list, or paste numbers.<br>Everything stays on this phone.<br><br>
+      <button class="big red" style="margin:0 auto" data-open="add">Add your first list</button></div>`;
+    return;
+  }
+  if (!shown.length) { $('#rows').innerHTML = `<div class="empty">Nothing here${q?' for “'+esc(ui.q)+'”':''}.</div>`; return; }
+
+  $('#rows').innerHTML = shown.map(c => {
+    const lo = lastOut(c), inb = c.log.filter(l=>l.type==='in').at(-1);
+    const due = c.followUp ? (c.followUp < Date.now() ? `<span class="overdue">due ${ago(c.followUp)==='just now'?'now':ago(c.followUp)}</span>` : `<span>⏰ ${stamp(c.followUp)}</span>`) : '';
+    const tries = c.log.filter(l=>l.type==='call').length;
+    return `<div class="row" data-id="${c.id}">
+      <div class="who" data-detail>
+        <div class="nm">${esc(c.name || 'No name')}</div>
+        <div class="ph">${esc(c.phone)}</div>
+        <div class="meta"><span class="tag s-${c.status}">${STATUS[c.status].t}</span>
+          ${lo ? `<span>${tries>1?tries+' tries · ':''}${ago(lo.t)}</span>` : ''}
+          ${inb ? `<span class="inbound">↙ called back ${ago(inb.t)}</span>` : ''} ${due}</div>
+      </div>
+      <div class="acts">
+        <button class="act" data-do="wa" aria-label="WhatsApp">${ICON.wa}</button>
+        <button class="act" data-do="sms" aria-label="Text">${ICON.sms}</button>
+        <button class="act call" data-do="call" aria-label="Call">${ICON.call}</button>
+      </div></div>`;
+  }).join('');
+}
+
+const ICON = {
+  call:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.5 15.5 0 006.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 013 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>',
+  sms:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v11H9l-5 4z" stroke-linejoin="round"/></svg>',
+  wa:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20l1.3-4A8 8 0 1112 20a8 8 0 01-4-1z" stroke-linejoin="round"/><path d="M9 9.5c.3 2.2 2.3 4.3 4.5 4.7l1-1" stroke-linecap="round"/></svg>'
+};
+
+/* ---------- actions: call / text / whatsapp ---------- */
+const byId = id => db.contacts.find(c => c.id === id);
+let pending = null;  // call awaiting an outcome once the user comes back to the app
+
+function fillMsg(c){ return (db.settings.msg || '').replaceAll('{name}', (c.name||'').split(' ')[0]); }
+function doAction(c, kind){
+  if (kind === 'call') {
+    c.log.push({ t: Date.now(), type: 'call' });
+    pending = c.id; save();
+    location.href = 'tel:' + digits(c.phone);
+  } else if (kind === 'sms') {
+    c.log.push({ t: Date.now(), type: 'sms' }); save();
+    const body = encodeURIComponent(fillMsg(c));
+    location.href = `sms:${digits(c.phone)}${/iPhone|iPad/.test(navigator.userAgent)?'&':'?'}body=${body}`;
+  } else if (kind === 'wa') {
+    c.log.push({ t: Date.now(), type: 'wa' }); save();
+    window.open(`https://wa.me/${intl(c.phone)}?text=${encodeURIComponent(fillMsg(c))}`, '_blank');
+  }
+}
+// When they come back from the phone app, ask how it went.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && pending) {
+    const c = byId(pending); pending = null;
+    if (c) setTimeout(() => openOutcome(c), 250);
+  }
+});
+
+function setOutcome(c, status, followUp){
+  c.status = status;
+  c.followUp = followUp || null;
+  const last = c.log.filter(l => l.type==='call').at(-1);
+  if (last && !last.outcome && Date.now() - last.t < 6*3600e3) last.outcome = status;
+  else c.log.push({ t: Date.now(), type: 'note', outcome: status });
+  save();
+}
+
+/* ---------- sheets ---------- */
+function openSheet(html, onMount){
+  $('#sheetBody').innerHTML = html;
+  $('#scrim').classList.add('on'); $('#sheet').classList.add('on');
+  $('#sheet').scrollTop = 0;
+  onMount && onMount($('#sheetBody'));
+}
+function closeSheet(){ $('#scrim').classList.remove('on'); $('#sheet').classList.remove('on'); }
+$('#scrim').onclick = closeSheet;
+
+function laterPicker(){
+  const opts = [['In 1 hour',1],['In 3 hours',3],['Tomorrow 10am','t10'],['Tomorrow 5pm','t17'],['In 3 days',72],['Next week',168]];
+  return `<div class="grid2" style="margin-top:8px">${opts.map(([t,v])=>`<button class="big light" data-later="${v}">${t}</button>`).join('')}</div>
+    <label class="l">Or pick exact time</label><input class="field" type="datetime-local" id="laterAt">
+    <button class="big dark" style="width:100%;margin-top:10px" id="laterGo">Save</button>`;
+}
+function laterValue(v){
+  if (String(v).startsWith('t')) { const d = new Date(); d.setDate(d.getDate()+1); d.setHours(+v.slice(1),0,0,0); return d.getTime(); }
+  return Date.now() + v*3600e3;
+}
+
+function openOutcome(c, after){
+  openSheet(`<h2>How did it go?</h2>
+    <p class="hint" style="margin-top:-8px">${esc(c.name||'')} · <span style="font-family:var(--mono)">${esc(c.phone)}</span></p>
+    <div class="grid2 outs">${OUTCOMES.map(([k,t,s,cls])=>`<button data-out="${k}" class="${cls||''}">${t}<span>${s}</span></button>`).join('')}
+    ${(()=>{const l=c.log.filter(x=>x.type==='call').at(-1);return l&&!l.outcome&&Date.now()-l.t<7200e3})()?`<button data-out="skip">Didn't call<span>Undo this attempt</span></button>`:''}</div>
+    <div id="laterBox"></div>
+    <label class="l">Quick note</label><input class="field" id="onote" placeholder="e.g. wants price list, owner is Ravi" value="${esc(c.note||'')}">`,
+  el => {
+    const keepNote = () => { c.note = el.querySelector('#onote').value.trim(); };
+    el.querySelectorAll('[data-out]').forEach(b => b.onclick = () => {
+      const k = b.dataset.out; keepNote();
+      if (k === 'skip') { const i = c.log.findLastIndex(l=>l.type==='call'); if (i>-1) c.log.splice(i,1); save(); closeSheet(); after&&after(); return; }
+      if (k === 'callback') {
+        const box = el.querySelector('#laterBox'); box.innerHTML = laterPicker();
+        box.querySelectorAll('[data-later]').forEach(x => x.onclick = () => { setOutcome(c,'callback',laterValue(x.dataset.later)); closeSheet(); toast('Reminder set'); after&&after(); });
+        box.querySelector('#laterGo').onclick = () => { const v = box.querySelector('#laterAt').value; if(!v) return; setOutcome(c,'callback',new Date(v).getTime()); closeSheet(); after&&after(); };
+        box.scrollIntoView({behavior:'smooth'}); return;
+      }
+      setOutcome(c, k); closeSheet(); toast(STATUS[k].t); after&&after();
+    });
+  });
+}
+
+function openDetail(c){
+  const lists = [...new Set(db.contacts.map(x=>x.list).filter(Boolean))];
+  const label = l => l.type==='call' ? '📞 Called' : l.type==='sms' ? '💬 Texted' : l.type==='wa' ? '🟢 WhatsApp' : l.type==='in' ? '↙ They called back' : '✎ Marked';
+  openSheet(`<h2>${esc(c.name||'No name')}</h2>
+    <div class="grid2" style="grid-template-columns:repeat(3,1fr)">
+      <button class="big dark" data-do="call">Call</button><button class="big light" data-do="sms">Text</button><button class="big light" data-do="wa">WhatsApp</button>
+    </div>
+    <button class="big light" id="inbound" style="width:100%;margin-top:8px;color:var(--green);border-color:var(--green)">↙ They called me back</button>
+    <button class="big light" id="markOut" style="width:100%;margin-top:8px">Set result…</button>
+    <label class="l">Name</label><input class="field" id="dName" value="${esc(c.name)}">
+    <label class="l">Number</label><input class="field" id="dPhone" type="tel" value="${esc(c.phone)}" style="font-family:var(--mono)">
+    <label class="l">List</label><input class="field" id="dList" list="dl" value="${esc(c.list||'')}">
+    <datalist id="dl">${lists.map(l=>`<option value="${esc(l)}">`).join('')}</datalist>
+    <label class="l">Notes</label><textarea class="field" id="dNote">${esc(c.note||'')}</textarea>
+    ${c.followUp?`<p class="hint">⏰ Follow-up ${stamp(c.followUp)} · <button class="linkbtn" id="clrF">clear</button></p>`:''}
+    <button class="big dark" id="dSave" style="width:100%;margin-top:14px">Save</button>
+    <label class="l" style="margin-top:20px">History</label>
+    <ul class="log">${c.log.length ? c.log.slice().reverse().map(l=>`<li><span>${label(l)}${l.outcome?' — '+STATUS[l.outcome].t:''}</span><time>${stamp(l.t)}</time></li>`).join('') : '<li class="hint">Not contacted yet · added '+stamp(c.created)+'</li>'}</ul>
+    <button class="linkbtn" id="dDel" style="margin-top:14px">Delete contact</button>`,
+  el => {
+    el.querySelectorAll('[data-do]').forEach(b => b.onclick = () => { closeSheet(); doAction(c, b.dataset.do); });
+    el.querySelector('#inbound').onclick = () => { c.log.push({t:Date.now(),type:'in'}); if (c.status==='new'||c.status==='noanswer') c.status='callback'; save(); closeSheet(); openOutcome(c); toast('Logged call back'); };
+    el.querySelector('#markOut').onclick = () => openOutcome(c);
+    const clr = el.querySelector('#clrF'); if (clr) clr.onclick = () => { c.followUp=null; save(); openDetail(c); };
+    el.querySelector('#dSave').onclick = () => {
+      c.name = el.querySelector('#dName').value.trim(); c.phone = el.querySelector('#dPhone').value.trim();
+      c.list = el.querySelector('#dList').value.trim(); c.note = el.querySelector('#dNote').value.trim();
+      save(); closeSheet(); toast('Saved');
+    };
+    el.querySelector('#dDel').onclick = () => { if (confirm('Delete '+(c.name||c.phone)+'?')) { db.contacts = db.contacts.filter(x=>x!==c); save(); closeSheet(); } };
+  });
+}
+
+/* ---------- adding numbers ---------- */
+function openAdd(){
+  openSheet(`<h2>Add numbers</h2><div class="menu">
+    <button data-a="cam"><span class="ic">📷</span><span><b>Take a photo</b><small>Snap the paper list, we read the numbers</small></span></button>
+    <button data-a="img"><span class="ic">🖼️</span><span><b>Pick a photo or screenshot</b><small>From gallery, WhatsApp, another device</small></span></button>
+    <button data-a="paste"><span class="ic">📋</span><span><b>Paste or type a list</b><small>One person per line — name and number</small></span></button>
+    <button data-a="one"><span class="ic">＋</span><span><b>Add one person</b><small>Name, number, done</small></span></button>
+    <button data-a="file"><span class="ic">📄</span><span><b>Import CSV / backup</b><small>Excel or Google Sheets export</small></span></button>
+  </div>`, el => {
+    el.querySelector('[data-a=cam]').onclick = () => $('#fileCam').click();
+    el.querySelector('[data-a=img]').onclick = () => $('#fileImg').click();
+    el.querySelector('[data-a=paste]').onclick = openPaste;
+    el.querySelector('[data-a=one]').onclick = () => review([{name:'',phone:''}], null, true);
+    el.querySelector('[data-a=file]').onclick = () => $('#fileData').click();
+  });
+}
+
+function openPaste(){
+  openSheet(`<h2>Paste a list</h2>
+    <textarea class="field" id="pt" style="min-height:200px;font-family:var(--mono);font-size:14px" placeholder="Ramesh Kumar 98765 43210&#10;Anita - 9123456789&#10;+44 7700 900123 John"></textarea>
+    <p class="hint">Any format works. We find the numbers and treat the rest of the line as the name.</p>
+    <button class="big dark" style="width:100%" id="pgo">Find numbers</button>`, el => {
+    el.querySelector('#pt').focus();
+    el.querySelector('#pgo').onclick = () => {
+      const rows = parse(el.querySelector('#pt').value);
+      if (!rows.length) return toast('No numbers found');
+      review(rows);
+    };
+  });
+}
+
+/* Pull name + number pairs out of messy text (OCR or pasted). */
+function parse(text){
+  const out = [];
+  const lines = text.replace(/[|]/g,' ').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  const re = /(\+?\d[\d\s\-().]{6,}\d)/g;
+  let carry = '';
+  for (let line of lines) {
+    // common OCR slips inside numbers
+    line = line.replace(/(?<=\d)[oO](?=\d)/g,'0').replace(/(?<=\d)[lI](?=\d)/g,'1');
+    const nums = [...line.matchAll(re)].map(m => m[1]).filter(n => digits(n).replace('+','').length >= 7 && digits(n).replace('+','').length <= 15);
+    if (!nums.length) { if (/[a-z]/i.test(line) && line.length < 40) carry = line; continue; }
+    let name = line;
+    nums.forEach(n => name = name.replace(n,' '));
+    name = name.replace(/^[\s\d.)\-:#,]+/, '').replace(/[\s\-:,–—]+$/,'').replace(/\s{2,}/g,' ').trim();
+    if (!/[a-z]/i.test(name)) name = carry;
+    carry = '';
+    nums.forEach(n => out.push({ name, phone: n.replace(/[^\d+\s\-]/g,'').replace(/\s{2,}/g,' ').trim() }));
+  }
+  return out;
+}
+
+async function loadOCR(){
+  if (window.Tesseract) return;
+  await new Promise((ok, bad) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js'; s.onload = ok; s.onerror = bad; document.head.appendChild(s); });
+}
+async function readPhoto(file){
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  openSheet(`<h2>Reading the list…</h2><img class="preview" src="${url}" alt="">
+    <div class="bar2"><i id="pg"></i></div><p class="hint" id="pgt">Loading reader (first time needs internet)…</p>`);
+  try {
+    await loadOCR();
+    const { data } = await Tesseract.recognize(file, 'eng', { logger: m => {
+      if (m.status === 'recognizing text') { $('#pg') && ($('#pg').style.width = Math.round(m.progress*100)+'%'); $('#pgt') && ($('#pgt').textContent = 'Reading… '+Math.round(m.progress*100)+'%'); }
+    }});
+    const rows = parse(data.text);
+    if (!rows.length) {
+      openSheet(`<h2>Couldn't spot numbers</h2><img class="preview" src="${url}" alt=""><p class="hint">Try a closer, flatter photo in good light — or fix the text below.</p>
+        <textarea class="field" id="raw" style="min-height:160px;font-family:var(--mono);font-size:14px">${esc(data.text)}</textarea>
+        <button class="big dark" style="width:100%;margin-top:10px" id="retry">Find numbers</button>`, el => {
+        el.querySelector('#retry').onclick = () => { const r = parse(el.querySelector('#raw').value); r.length ? review(r, url) : toast('Still no numbers'); };
+      });
+      return;
+    }
+    review(rows, url);
+  } catch (e) {
+    openSheet(`<h2>Reader didn't load</h2><p class="hint">Photo reading needs internet the very first time. Connect once, then try again — or paste the list instead.</p>
+      <button class="big dark" style="width:100%" id="toPaste">Paste instead</button>`, el => el.querySelector('#toPaste').onclick = openPaste);
+  }
+}
+
+/* Let the user check what we found before saving. */
+function review(rows, img, single){
+  const known = new Set(db.contacts.map(c => digits(c.phone).slice(-10)));
+  const lists = [...new Set(db.contacts.map(x=>x.list).filter(Boolean))];
+  const defList = ui.list !== 'all' ? ui.list : (single ? '' : 'Sheet ' + new Date().toLocaleDateString(undefined,{day:'numeric',month:'short'}));
+  openSheet(`<h2>${single ? 'Add person' : 'Check '+rows.length+' found'}</h2>
+    ${img ? `<img class="preview" src="${img}" alt="">` : ''}
+    ${single ? '' : '<p class="hint" style="margin-top:-6px">Fix anything the reader got wrong. Grey rows are already saved.</p>'}
+    <div id="rvs">${rows.map((r,i)=>{ const dup = known.has(digits(r.phone).slice(-10)) && r.phone; return `
+      <div class="rv ${dup?'dup':''}"><input type="checkbox" ${dup?'':'checked'} ${single?'hidden':''}>
+      <input type="text" placeholder="Name" value="${esc(r.name)}"><input type="tel" placeholder="Number" value="${esc(r.phone)}"></div>`; }).join('')}</div>
+    ${single ? '' : '<button class="linkbtn" id="addRow">+ add row</button>'}
+    <label class="l">Save into list</label><input class="field" id="rvList" list="dl2" value="${esc(defList)}" placeholder="e.g. Expo leads, Market road">
+    <datalist id="dl2">${lists.map(l=>`<option value="${esc(l)}">`).join('')}</datalist>
+    <button class="big dark" style="width:100%;margin-top:14px" id="rvSave">Save</button>`,
+  el => {
+    if (single) el.querySelector('input[type=text]').focus();
+    const ar = el.querySelector('#addRow');
+    if (ar) ar.onclick = () => { el.querySelector('#rvs').insertAdjacentHTML('beforeend', `<div class="rv"><input type="checkbox" checked><input type="text" placeholder="Name"><input type="tel" placeholder="Number"></div>`); };
+    el.querySelector('#rvSave').onclick = () => {
+      const list = el.querySelector('#rvList').value.trim();
+      let n = 0;
+      el.querySelectorAll('.rv').forEach(r => {
+        const [cb, nm, ph] = r.querySelectorAll('input');
+        if (!cb.checked || digits(ph.value).replace('+','').length < 5) return;
+        db.contacts.push({ id: uid(), name: nm.value.trim(), phone: ph.value.trim(), list, status: 'new', note: '', followUp: null, created: Date.now(), log: [] });
+        n++;
+      });
+      if (!n) return toast('Nothing to save');
+      if (list) ui.list = list;
+      ui.tab = 'todo'; save(); closeSheet(); toast(n + (n>1?' numbers':' number') + ' saved');
+    };
+  });
+}
+
+/* ---------- focus / power-dial mode ---------- */
+let queue = [], qi = 0;
+function startFocus(){
+  queue = db.contacts.filter(inList).filter(c => {
+    const b = bucket(c);
+    return b === 'todo' || (c.status === 'callback' && (!c.followUp || c.followUp <= Date.now()));
+  }).sort(sortFn).map(c => c.id);
+  if (!queue.length) return toast('Nobody left to call 🎉');
+  qi = 0; $('#focus').classList.add('on'); showFocus();
+}
+function showFocus(){
+  const f = $('#focus');
+  if (qi >= queue.length) {
+    f.innerHTML = `<div class="top"><span>done</span><button class="x" id="fx">Close</button></div>
+      <div class="mid"><div class="fn">That's the list.</div><div class="fnote">${queue.length} people worked through. Nice.</div></div>`;
+    f.querySelector('#fx').onclick = () => f.classList.remove('on'); return;
+  }
+  const c = byId(queue[qi]);
+  if (!c) { qi++; return showFocus(); }
+  const tries = c.log.filter(l=>l.type==='call').length;
+  f.innerHTML = `<div class="top"><span>${qi+1} / ${queue.length}${c.list?' · '+esc(c.list):''}</span><button class="x" id="fx">Stop</button></div>
+    <div class="mid">
+      <div class="fn">${esc(c.name || 'No name')}</div>
+      <div class="fp">${esc(c.phone)}</div>
+      <div class="fnote">${tries ? `Tried ${tries}× · last ${ago(lastOut(c).t)}` : 'First call'}${c.note ? '<br>“'+esc(c.note)+'”' : ''}</div>
+    </div>
+    <button class="dial" id="fcall">${ICON.call.replace('<svg','<svg width="26" height="26"')} Call</button>
+    <div class="row3"><button class="ghost" id="fwa">WhatsApp</button><button class="ghost" id="fskip">Skip →</button></div>`;
+  f.querySelector('#fx').onclick = () => f.classList.remove('on');
+  f.querySelector('#fskip').onclick = () => { qi++; showFocus(); };
+  f.querySelector('#fwa').onclick = () => doAction(c, 'wa');
+  f.querySelector('#fcall').onclick = () => {
+    c.log.push({ t: Date.now(), type: 'call' }); save();
+    location.href = 'tel:' + digits(c.phone);
+    focusPending = c.id;
+  };
+}
+let focusPending = null;
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && focusPending) {
+    const c = byId(focusPending); focusPending = null;
+    if (c) setTimeout(() => { $('#focus').classList.remove('on'); openOutcome(c, () => { qi++; $('#focus').classList.add('on'); showFocus(); }); }, 250);
+  }
+});
+
+/* ---------- settings / backup ---------- */
+function openSettings(){
+  openSheet(`<h2>Settings</h2>
+    <label class="l">Your country code (for WhatsApp)</label>
+    <input class="field" id="sCc" placeholder="+91" value="${esc(db.settings.cc)}" inputmode="tel">
+    <p class="hint">Numbers written without a + get this added when opening WhatsApp.</p>
+    <label class="l">Default text / WhatsApp message</label>
+    <textarea class="field" id="sMsg">${esc(db.settings.msg)}</textarea>
+    <p class="hint">{name} becomes the person's first name.</p>
+    <button class="big dark" style="width:100%;margin-top:10px" id="sSave">Save</button>
+    <label class="l" style="margin-top:24px">Your data</label>
+    <p class="hint" style="margin-top:0">Stored only on this phone — not in contacts, not in any cloud. Export a backup now and then.</p>
+    <div class="grid2"><button class="big light" id="exCsv">Export CSV</button><button class="big light" id="exJson">Full backup</button></div>
+    <button class="big light" style="width:100%;margin-top:8px" id="imp">Restore / import file</button>
+    ${ui.list!=='all'?`<button class="linkbtn" id="delList" style="display:block;margin-top:18px">Delete list “${esc(ui.list)}”</button>`:''}
+    <button class="linkbtn" id="wipe" style="display:block">Erase everything</button>`,
+  el => {
+    el.querySelector('#sSave').onclick = () => { db.settings.cc = el.querySelector('#sCc').value.trim(); db.settings.msg = el.querySelector('#sMsg').value; save(); closeSheet(); toast('Saved'); };
+    el.querySelector('#exCsv').onclick = exportCsv;
+    el.querySelector('#exJson').onclick = () => download('ringbook-backup.json', JSON.stringify(db), 'application/json');
+    el.querySelector('#imp').onclick = () => $('#fileData').click();
+    const dl = el.querySelector('#delList');
+    if (dl) dl.onclick = () => { if (confirm('Delete all people in “'+ui.list+'”?')) { db.contacts = db.contacts.filter(c => c.list !== ui.list); ui.list='all'; save(); closeSheet(); } };
+    el.querySelector('#wipe').onclick = () => { if (confirm('Erase all saved numbers and history from this phone?') && confirm('Really? This cannot be undone.')) { db.contacts = []; save(); closeSheet(); } };
+  });
+}
+function download(name, text, type){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function exportCsv(){
+  const q = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
+  const head = ['Name','Number','List','Status','Calls','Last called','Called back','Follow up','Note'];
+  const lines = db.contacts.map(c => {
+    const calls = c.log.filter(l=>l.type==='call'), inb = c.log.filter(l=>l.type==='in').at(-1);
+    return [c.name, c.phone, c.list, STATUS[c.status].t, calls.length, calls.at(-1) ? stamp(calls.at(-1).t) : '', inb ? stamp(inb.t) : '', c.followUp ? stamp(c.followUp) : '', c.note].map(q).join(',');
+  });
+  download('ringbook.csv', '﻿' + [head.map(q).join(','), ...lines].join('\n'), 'text/csv');
+}
+$('#fileData').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  const text = await f.text();
+  if (f.name.endsWith('.json')) {
+    try {
+      const d = JSON.parse(text);
+      if (!d.contacts) throw 0;
+      if (!confirm(`Restore ${d.contacts.length} contacts? This replaces what's on the phone now.`)) return;
+      db.contacts = d.contacts; db.settings = { ...db.settings, ...d.settings }; save(); closeSheet(); toast('Restored');
+    } catch { toast('Not a Ringbook backup'); }
+  } else {
+    // CSV: guess name / number columns
+    const rows = text.split(/\r?\n/).filter(Boolean).map(l => l.match(/("([^"]|"")*"|[^,;\t]*)(?=[,;\t]|$)/g).filter((_,i,a)=>true).map(v => v.replace(/^"|"$/g,'').replace(/""/g,'"').trim()));
+    const head = rows[0].map(h => h.toLowerCase());
+    let ni = head.findIndex(h => /name/.test(h)), pi = head.findIndex(h => /phone|number|mobile|contact/.test(h));
+    const body = (ni > -1 || pi > -1) ? rows.slice(1) : rows;
+    if (pi < 0) pi = (body[0]||[]).findIndex(v => digits(v).length >= 7);
+    if (ni < 0) ni = (body[0]||[]).findIndex((v,i) => i !== pi && /[a-z]/i.test(v));
+    const found = body.map(r => ({ name: r[ni] || '', phone: r[pi] || '' })).filter(r => digits(r.phone).length >= 7);
+    found.length ? review(found) : toast('No numbers in that file');
+  }
+};
+
+/* ---------- wiring ---------- */
+$('#fileCam').onchange = e => { const f = e.target.files[0]; e.target.value=''; readPhoto(f); };
+$('#fileImg').onchange = e => { const f = e.target.files[0]; e.target.value=''; readPhoto(f); };
+$('#btnAdd').onclick = openAdd;
+$('#btnStart').onclick = startFocus;
+$('#btnSettings').onclick = openSettings;
+$('#q').oninput = e => { ui.q = e.target.value; render(); };
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-list],[data-tab],[data-do],[data-detail],[data-open]');
+  if (!t || t.closest('#sheet') || t.closest('#focus')) return;
+  if (t.dataset.list) { ui.list = t.dataset.list; render(); }
+  else if (t.dataset.tab) { ui.tab = t.dataset.tab; render(); }
+  else if (t.dataset.open) openAdd();
+  else {
+    const c = byId(t.closest('.row').dataset.id);
+    t.dataset.do ? doAction(c, t.dataset.do) : openDetail(c);
+  }
+});
+// refresh "x min ago" labels and overdue reminders
+setInterval(render, 60000);
+render();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
