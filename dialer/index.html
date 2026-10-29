@@ -32,6 +32,8 @@ header{padding:calc(18px + env(safe-area-inset-top)) 0 8px;display:flex;align-it
 .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
 .chip{flex:none;padding:7px 13px;border-radius:999px;border:1.5px solid var(--line);background:var(--card);font-size:14px;white-space:nowrap}
+.chips.wrapc{flex-wrap:wrap;overflow:visible}
+.chip.new{border-style:dashed;color:var(--ink2)}
 .chip.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
 .tabs{display:grid;grid-template-columns:repeat(4,1fr);margin:12px 0;border-bottom:1.5px solid var(--line)}
 .tab{padding:10px 0;font-size:14px;color:var(--ink2);border-bottom:3px solid transparent;margin-bottom:-1.5px}
@@ -94,6 +96,7 @@ textarea.field{min-height:80px;resize:vertical}
 .rv{display:grid;grid-template-columns:28px 1fr 1fr;gap:6px;align-items:center;margin-bottom:6px}
 .rv input[type=text],.rv input[type=tel]{padding:9px 10px;border-radius:10px;border:1.5px solid var(--line);background:var(--card);width:100%;min-width:0}
 .rv input[type=tel]{font-family:var(--mono);font-size:14px}
+.rv.one{grid-template-columns:1fr 1fr}
 .rv.dup input{opacity:.5}
 .rv input[type=checkbox]{width:20px;height:20px;accent-color:var(--ink)}
 .preview{width:100%;max-height:180px;object-fit:contain;border-radius:12px;background:#000;margin-bottom:10px}
@@ -207,7 +210,37 @@ function bucket(c){
   if (c.status === 'callback' || c.status === 'interested') return 'follow';
   return 'done';
 }
-function inList(c){ return ui.list === 'all' || c.list === ui.list; }
+function inList(c){ return ui.list === 'all' || (ui.list === NONE ? !c.list : c.list === ui.list); }
+const NONE = '__none';
+function allLists(){ return [...new Set([...(db.lists||[]), ...db.contacts.map(c => c.list).filter(Boolean)])]; }
+
+/* Tap-to-pick list chooser used when adding or editing people. */
+function listPicker(id, current){
+  const ls = allLists();
+  return `<div class="chips wrapc" id="${id}" data-val="${esc(current||'')}">
+    <button type="button" class="chip ${!current?'on':''}" data-pick="">No list</button>
+    ${ls.map(l=>`<button type="button" class="chip ${current===l?'on':''}" data-pick="${esc(l)}">${esc(l)}</button>`).join('')}
+    <button type="button" class="chip new" data-pick="__new">+ New list</button></div>
+    <input class="field" id="${id}New" placeholder="New list name, e.g. Contacts B" hidden style="margin-top:8px">`;
+}
+function wirePicker(el, id){
+  const box = el.querySelector('#'+id), inp = el.querySelector('#'+id+'New');
+  box.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => {
+    box.querySelectorAll('.chip').forEach(x => x.classList.remove('on')); b.classList.add('on');
+    if (b.dataset.pick === '__new') { inp.hidden = false; inp.focus(); } else { inp.hidden = true; box.dataset.val = b.dataset.pick; }
+  });
+  return () => inp.hidden ? box.dataset.val : inp.value.trim();
+}
+function openNewList(){
+  openSheet(`<h2>New list</h2><input class="field" id="nl" placeholder="e.g. Contacts A, Expo leads">
+    <button class="big dark" style="width:100%;margin-top:12px" id="nlGo">Create</button>`, el => {
+    el.querySelector('#nl').focus();
+    el.querySelector('#nlGo').onclick = () => {
+      const n = el.querySelector('#nl').value.trim(); if (!n) return;
+      db.lists = [...new Set([...(db.lists||[]), n])]; ui.list = n; save(); closeSheet(); toast('List “'+n+'” ready — tap Add');
+    };
+  });
+}
 function sortFn(a,b){
   // follow-ups due first, then never-called, then oldest attempt
   const fa = a.followUp || Infinity, fb = b.followUp || Infinity;
@@ -227,10 +260,11 @@ function render(){
     <div><b>${all.filter(c=>c.status==='interested').length}</b>interested</div>
     <div><b>${all.length}</b>saved</div>`;
 
-  const lists = [...new Set(all.map(c => c.list).filter(Boolean))];
-  if (ui.list !== 'all' && !lists.includes(ui.list)) ui.list = 'all';
-  $('#lists').innerHTML = [['all','All lists'], ...lists.map(l=>[l,l])]
-    .map(([v,t]) => `<button class="chip ${ui.list===v?'on':''}" data-list="${esc(v)}">${esc(t)}</button>`).join('');
+  const lists = allLists(), hasLoose = all.some(c => !c.list);
+  if (ui.list !== 'all' && ui.list !== NONE && !lists.includes(ui.list)) ui.list = 'all';
+  $('#lists').innerHTML = [['all','All'], ...lists.map(l=>[l,l]), ...(hasLoose?[[NONE,'No list']]:[])]
+    .map(([v,t]) => `<button class="chip ${ui.list===v?'on':''}" data-list="${esc(v)}">${esc(t)}</button>`).join('')
+    + `<button class="chip new" data-newlist="1">+ New list</button>`;
 
   const scoped = all.filter(inList);
   const count = k => k==='all' ? scoped.length : scoped.filter(c => bucket(c)===k).length;
@@ -243,6 +277,11 @@ function render(){
     .filter(c => !q || (c.name+' '+c.phone+' '+(c.note||'')).toLowerCase().includes(q) || digits(c.phone).includes(digits(q)||'#'))
     .sort(sortFn);
 
+  if (!scoped.length && ui.list !== 'all') {
+    $('#rows').innerHTML = `<div class="empty"><h3>“${esc(ui.list)}” is empty</h3>Add people and they'll be saved into this list.<br><br>
+      <button class="big red" style="margin:0 auto" data-open="add">Add to this list</button></div>`;
+    return;
+  }
   if (!all.length) {
     $('#rows').innerHTML = `<div class="empty"><h3>Your call sheet is empty</h3>
       Snap a photo of a paper list, or paste numbers.<br>Everything stays on this phone.<br><br>
@@ -259,7 +298,7 @@ function render(){
       <div class="who" data-detail>
         <div class="nm">${esc(c.name || 'No name')}</div>
         <div class="ph">${esc(c.phone)}</div>
-        <div class="meta"><span class="tag s-${c.status}">${STATUS[c.status].t}</span>
+        <div class="meta"><span class="tag s-${c.status}">${STATUS[c.status].t}</span>${ui.list==='all'&&c.list?`<span>${esc(c.list)}</span>`:''}
           ${lo ? `<span>${tries>1?tries+' tries · ':''}${ago(lo.t)}</span>` : ''}
           ${inb ? `<span class="inbound">↙ called back ${ago(inb.t)}</span>` : ''} ${due}</div>
       </div>
@@ -358,7 +397,6 @@ function openOutcome(c, after){
 }
 
 function openDetail(c){
-  const lists = [...new Set(db.contacts.map(x=>x.list).filter(Boolean))];
   const label = l => l.type==='call' ? '📞 Called' : l.type==='sms' ? '💬 Texted' : l.type==='wa' ? '🟢 WhatsApp' : l.type==='in' ? '↙ They called back' : '✎ Marked';
   openSheet(`<h2>${esc(c.name||'No name')}</h2>
     <div class="grid2" style="grid-template-columns:repeat(3,1fr)">
@@ -368,8 +406,7 @@ function openDetail(c){
     <button class="big light" id="markOut" style="width:100%;margin-top:8px">Set result…</button>
     <label class="l">Name</label><input class="field" id="dName" value="${esc(c.name)}">
     <label class="l">Number</label><input class="field" id="dPhone" type="tel" value="${esc(c.phone)}" style="font-family:var(--mono)">
-    <label class="l">List</label><input class="field" id="dList" list="dl" value="${esc(c.list||'')}">
-    <datalist id="dl">${lists.map(l=>`<option value="${esc(l)}">`).join('')}</datalist>
+    <label class="l">List</label>${listPicker('dList', c.list)}
     <label class="l">Notes</label><textarea class="field" id="dNote">${esc(c.note||'')}</textarea>
     ${c.followUp?`<p class="hint">⏰ Follow-up ${stamp(c.followUp)} · <button class="linkbtn" id="clrF">clear</button></p>`:''}
     <button class="big dark" id="dSave" style="width:100%;margin-top:14px">Save</button>
@@ -377,13 +414,14 @@ function openDetail(c){
     <ul class="log">${c.log.length ? c.log.slice().reverse().map(l=>`<li><span>${label(l)}${l.outcome?' — '+STATUS[l.outcome].t:''}</span><time>${stamp(l.t)}</time></li>`).join('') : '<li class="hint">Not contacted yet · added '+stamp(c.created)+'</li>'}</ul>
     <button class="linkbtn" id="dDel" style="margin-top:14px">Delete contact</button>`,
   el => {
+    const getList = wirePicker(el, 'dList');
     el.querySelectorAll('[data-do]').forEach(b => b.onclick = () => { closeSheet(); doAction(c, b.dataset.do); });
     el.querySelector('#inbound').onclick = () => { c.log.push({t:Date.now(),type:'in'}); if (c.status==='new'||c.status==='noanswer') c.status='callback'; save(); closeSheet(); openOutcome(c); toast('Logged call back'); };
     el.querySelector('#markOut').onclick = () => openOutcome(c);
     const clr = el.querySelector('#clrF'); if (clr) clr.onclick = () => { c.followUp=null; save(); openDetail(c); };
     el.querySelector('#dSave').onclick = () => {
       c.name = el.querySelector('#dName').value.trim(); c.phone = el.querySelector('#dPhone').value.trim();
-      c.list = el.querySelector('#dList').value.trim(); c.note = el.querySelector('#dNote').value.trim();
+      c.list = getList(); c.note = el.querySelector('#dNote').value.trim();
       save(); closeSheet(); toast('Saved');
     };
     el.querySelector('#dDel').onclick = () => { if (confirm('Delete '+(c.name||c.phone)+'?')) { db.contacts = db.contacts.filter(x=>x!==c); save(); closeSheet(); } };
@@ -475,24 +513,25 @@ async function readPhoto(file){
 /* Let the user check what we found before saving. */
 function review(rows, img, single){
   const known = new Set(db.contacts.map(c => digits(c.phone).slice(-10)));
-  const lists = [...new Set(db.contacts.map(x=>x.list).filter(Boolean))];
-  const defList = ui.list !== 'all' ? ui.list : (single ? '' : 'Sheet ' + new Date().toLocaleDateString(undefined,{day:'numeric',month:'short'}));
+  const defList = ui.list === NONE ? '' : ui.list !== 'all' ? ui.list : (single ? '' : 'Sheet ' + new Date().toLocaleDateString(undefined,{day:'numeric',month:'short'}));
   openSheet(`<h2>${single ? 'Add person' : 'Check '+rows.length+' found'}</h2>
     ${img ? `<img class="preview" src="${img}" alt="">` : ''}
     ${single ? '' : '<p class="hint" style="margin-top:-6px">Fix anything the reader got wrong. Grey rows are already saved.</p>'}
     <div id="rvs">${rows.map((r,i)=>{ const dup = known.has(digits(r.phone).slice(-10)) && r.phone; return `
-      <div class="rv ${dup?'dup':''}"><input type="checkbox" ${dup?'':'checked'} ${single?'hidden':''}>
+      <div class="rv ${dup?'dup':''} ${single?'one':''}"><input type="checkbox" ${dup?'':'checked'} ${single?'hidden':''}>
       <input type="text" placeholder="Name" value="${esc(r.name)}"><input type="tel" placeholder="Number" value="${esc(r.phone)}"></div>`; }).join('')}</div>
     ${single ? '' : '<button class="linkbtn" id="addRow">+ add row</button>'}
-    <label class="l">Save into list</label><input class="field" id="rvList" list="dl2" value="${esc(defList)}" placeholder="e.g. Expo leads, Market road">
-    <datalist id="dl2">${lists.map(l=>`<option value="${esc(l)}">`).join('')}</datalist>
+    <label class="l">Save into list</label>${listPicker('rvList', defList)}
     <button class="big dark" style="width:100%;margin-top:14px" id="rvSave">Save</button>`,
   el => {
     if (single) el.querySelector('input[type=text]').focus();
+    const getList = wirePicker(el, 'rvList');
+    if (defList && !allLists().includes(defList)) { const nb = el.querySelector('#rvList [data-pick="__new"]'); nb.click(); el.querySelector('#rvListNew').value = defList; }
     const ar = el.querySelector('#addRow');
     if (ar) ar.onclick = () => { el.querySelector('#rvs').insertAdjacentHTML('beforeend', `<div class="rv"><input type="checkbox" checked><input type="text" placeholder="Name"><input type="tel" placeholder="Number"></div>`); };
     el.querySelector('#rvSave').onclick = () => {
-      const list = el.querySelector('#rvList').value.trim();
+      const list = getList();
+      if (list) db.lists = [...new Set([...(db.lists||[]), list])];
       let n = 0;
       el.querySelectorAll('.rv').forEach(r => {
         const [cb, nm, ph] = r.querySelectorAll('input');
@@ -501,7 +540,7 @@ function review(rows, img, single){
         n++;
       });
       if (!n) return toast('Nothing to save');
-      if (list) ui.list = list;
+      ui.list = list || (ui.list === 'all' ? 'all' : NONE);
       ui.tab = 'todo'; save(); closeSheet(); toast(n + (n>1?' numbers':' number') + ' saved');
     };
   });
@@ -566,7 +605,7 @@ function openSettings(){
     <p class="hint" style="margin-top:0">Stored only on this phone — not in contacts, not in any cloud. Export a backup now and then.</p>
     <div class="grid2"><button class="big light" id="exCsv">Export CSV</button><button class="big light" id="exJson">Full backup</button></div>
     <button class="big light" style="width:100%;margin-top:8px" id="imp">Restore / import file</button>
-    ${ui.list!=='all'?`<button class="linkbtn" id="delList" style="display:block;margin-top:18px">Delete list “${esc(ui.list)}”</button>`:''}
+    ${ui.list!=='all'&&ui.list!==NONE?`<button class="linkbtn" id="delList" style="display:block;margin-top:18px">Delete list “${esc(ui.list)}”</button>`:''}
     <button class="linkbtn" id="wipe" style="display:block">Erase everything</button>`,
   el => {
     el.querySelector('#sSave').onclick = () => { db.settings.cc = el.querySelector('#sCc').value.trim(); db.settings.msg = el.querySelector('#sMsg').value; save(); closeSheet(); toast('Saved'); };
@@ -574,7 +613,7 @@ function openSettings(){
     el.querySelector('#exJson').onclick = () => download('ringbook-backup.json', JSON.stringify(db), 'application/json');
     el.querySelector('#imp').onclick = () => $('#fileData').click();
     const dl = el.querySelector('#delList');
-    if (dl) dl.onclick = () => { if (confirm('Delete all people in “'+ui.list+'”?')) { db.contacts = db.contacts.filter(c => c.list !== ui.list); ui.list='all'; save(); closeSheet(); } };
+    if (dl) dl.onclick = () => { if (confirm('Delete all people in “'+ui.list+'”?')) { db.contacts = db.contacts.filter(c => c.list !== ui.list); db.lists = (db.lists||[]).filter(l => l !== ui.list); ui.list='all'; save(); closeSheet(); } };
     el.querySelector('#wipe').onclick = () => { if (confirm('Erase all saved numbers and history from this phone?') && confirm('Really? This cannot be undone.')) { db.contacts = []; save(); closeSheet(); } };
   });
 }
@@ -623,9 +662,10 @@ $('#btnStart').onclick = startFocus;
 $('#btnSettings').onclick = openSettings;
 $('#q').oninput = e => { ui.q = e.target.value; render(); };
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-list],[data-tab],[data-do],[data-detail],[data-open]');
+  const t = e.target.closest('[data-list],[data-tab],[data-do],[data-detail],[data-open],[data-newlist]');
   if (!t || t.closest('#sheet') || t.closest('#focus')) return;
-  if (t.dataset.list) { ui.list = t.dataset.list; render(); }
+  if (t.dataset.newlist) openNewList();
+  else if (t.dataset.list) { ui.list = t.dataset.list; render(); }
   else if (t.dataset.tab) { ui.tab = t.dataset.tab; render(); }
   else if (t.dataset.open) openAdd();
   else {
